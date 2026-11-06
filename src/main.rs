@@ -9,17 +9,17 @@ use eframe::egui;
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size(egui::vec2(600.0, 300.0)),
+            .with_inner_size(egui::vec2(800.0, 400.0)),
         ..Default::default()
     };
     eframe::run_native(
         "xmotion",
         options,
-        Box::new(cc| {
+        Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::new(XmotionApp::default());
-        }
-    ))
+            Box::new(XmotionApp::default())
+        }),
+    )
 }
 
 #[derive(PartialEq)]
@@ -30,7 +30,7 @@ enum ActiveWindow {
     Settings,
 }
 
-struct Wallpaper_Video {
+struct WallpaperVideo {
     video_path : String,
     thumb_path : String,
 }
@@ -40,8 +40,8 @@ pub struct XmotionApp {
     pub folder_path: String,
     pub top_bar: bool,
     pub transparency: bool,
-    gallery: Vec<Wallpaper_Video>,
-    thumb_receiver: Option<Receiver<Wallpaper_Video>>,
+    gallery: Vec<WallpaperVideo>,
+    thumb_receiver: Option<Receiver<WallpaperVideo>>,
     current_wallpaper: Option<Child>,
 }
 
@@ -65,6 +65,10 @@ impl eframe::App for XmotionApp {
             ui.horizontal(|ui| {
                 ui.heading("xmotion - a Wallpaper Manager");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    
+                    if ui.button("G").clicked() {
+                        self.current_window = ActiveWindow::Wallpaper;
+                    }
                     if ui.button("⚙").clicked() {
                         self.current_window = ActiveWindow::Settings;
                     }
@@ -92,11 +96,11 @@ impl eframe::App for XmotionApp {
                                let cache_folder = "/tmp/xmotion_cache";
                                let _ = fs::create_dir_all(cache_folder);
 
-                               if let Ok(files) = fs::read_dir(&folder_path) {
+                               if let Ok(files) = fs::read_dir(&folder) {
                                     for file in files.flatten() {
-                                        let path = gile.path();
+                                        let path = file.path();
 
-                                        if path.extension().and_then(|e| e.to.str()) == Some("mp4") {
+                                        if path.extension().and_then(|e| e.to_str()) == Some("mp4") {
                                             let video_path = path.to_string_lossy().to_string();
                                             let video_name = path.file_name().unwrap().to_string_lossy();
                                             let thumb_path = format!("{}/{}.jpg", cache_folder, video_name);
@@ -113,7 +117,7 @@ impl eframe::App for XmotionApp {
                                                     .output();
                                             }
 
-                                            let item = Wallpaper_Video { video_path, thumb_path};
+                                            let item = WallpaperVideo { video_path, thumb_path};
                                             let _ = tx.send(item);
                                         }
                                     }
@@ -132,6 +136,12 @@ impl eframe::App for XmotionApp {
                         ui.add_space(20.0);
                         ui.label("Top Bar: ");
                         ui.add_space(20.0);
+                        ui.label("Size: ");
+                        ui.add_space(20.0);
+                        ui.label("Random Wallpaper Every Launch: ");
+                        ui.add_space(20.0);
+                        ui.label("Random Wallpaper Every Time Interval: ");
+                        ui.add_space(20.0);
                         
 
                         if ui.button("Save").clicked() {
@@ -143,7 +153,7 @@ impl eframe::App for XmotionApp {
                 }
                 ActiveWindow::Saving => {
                     ui.vertical_centered(|ui| {
-                        ui.add_space("100.0");
+                        ui.add_space(100.0);
                         ui.spinner();
                         ui.label("Saving....");
                         ui.label(format!("Saving {}", self.gallery.len()));
@@ -156,12 +166,12 @@ impl eframe::App for XmotionApp {
                             Err(std::sync::mpsc::TryRecvError::Empty) => {}
 
                             Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                                self.state = ActiveWindow::Wallpaper;
+                                self.current_window = ActiveWindow::Wallpaper;
                             }
                         }
                     }
 
-                    ctx_request_repaint();
+                    ctx.request_repaint();
                 }
                 ActiveWindow::Wallpaper => {
                     egui::ScrollArea::vertical().show(ui, |ui|{
@@ -169,8 +179,8 @@ impl eframe::App for XmotionApp {
 
                         let spacing = ui.spacing().item_spacing.x;
                         let columns = 4.0;
-                        let thumb_width = ((available_width - (spacing * (columns - 1.0))) / columns ) - 0.1;
-                        let thumb_height = thumb_width * (9 / 16);
+                        let thumb_width = ((available_width - (spacing * (columns - 1.0))) / columns ) - 10.0;
+                        let thumb_height = thumb_width * (9.0 / 16.0);
 
                         ui.horizontal_wrapped(|ui|{
                             for item in &self.gallery {
@@ -179,12 +189,12 @@ impl eframe::App for XmotionApp {
                                 .rounding(8.0);
                                 
                                 if ui.add(egui::ImageButton::new(thumb)).clicked(){
-                                    if let Some(mut old_process) = self.current_process.take() {
-                                        let _ = old_process.kill();
-                                        let _ = old_process.wait();
+                                    if let Some(mut old_wallpaper) = self.current_wallpaper.take() {
+                                        let _ = old_wallpaper.kill();
+                                        let _ = old_wallpaper.wait();
                                     }
 
-                                    let new_process = Command::new("xwinwrap")
+                                    let new_wallpaper = Command::new("xwinwrap")
                                         .args([
                                             "-ni", "-b", "-fs", "-s", "-st", "-sp", "-nf", "-ov",
                                             "--", 
@@ -193,8 +203,8 @@ impl eframe::App for XmotionApp {
                                         ])
                                         .spawn();
 
-                                    if let Ok(child) = new_process {
-                                        self.current_process = Some(child);
+                                    if let Ok(child) = new_wallpaper {
+                                        self.current_wallpaper = Some(child);
                                     }
                                 }
 
