@@ -7,6 +7,4 @@ A sleek, lightweight X11 system tray utility that manages live video wallpapers 
 
 - **[xwinwrap](https://github.com)** - The brilliant X11 utility that enables sticking any player window directly to the desktop root layer.
 - **[mpv player](https://mpv.io)** - The legendary, highly customizable media player that delivers smooth, hardware-accelerated video rendering.
-- **[ffmpegthumbnailer](https://github.com)** - The lightning-fast video framework utilized to instantly create your desktop thumbnail layouts.
-- **[PyQt6](https://riverbankcomputing.com)** - The robust graphical interface pipeline used to bind the desktop system tray layouts.
 
