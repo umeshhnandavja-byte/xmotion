@@ -9,7 +9,8 @@ use eframe::egui;
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size(egui::vec2(800.0, 400.0)),
+            .with_inner_size(egui::vec2(800.0, 400.0))
+            .with_transparent(true),
         ..Default::default()
     };
     eframe::run_native(
@@ -39,7 +40,7 @@ pub struct XmotionApp {
     current_window: ActiveWindow,
     pub folder_path: String,
     pub top_bar: bool,
-    pub transparency: bool,
+    pub transparency: u8,
     gallery: Vec<WallpaperVideo>,
     thumb_receiver: Option<Receiver<WallpaperVideo>>,
     current_wallpaper: Option<Child>,
@@ -74,7 +75,7 @@ impl Default for XmotionApp {
             current_window: starting_window,
             folder_path: starting_folder,
             top_bar: true,
-            transparency: true,
+            transparency: 150,
             gallery: Vec::new(),
             thumb_receiver: starting_receiver,
             current_wallpaper: None,
@@ -84,22 +85,32 @@ impl Default for XmotionApp {
 
 impl eframe::App for XmotionApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("xmotion - a Wallpaper Manager");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    
-                    if ui.button("G").clicked() {
-                        self.current_window = ActiveWindow::Wallpaper;
-                    }
-                    if ui.button("⚙").clicked() {
-                        self.current_window = ActiveWindow::Settings;
-                    }
+        
+        let backfround_frame = egui::Frame::none()
+            .fill(egui::Color32::from_rgba_premultiplied(30, 30, 30, self.transparency));
+
+        if self.top_bar {
+            egui::TopBottomPanel::top("top_bar")
+                .frame(backfround_frame)
+                .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading("xmotion - a Wallpaper Manager");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        
+                        if ui.button("G").clicked() {
+                            self.current_window = ActiveWindow::Wallpaper;
+                        }
+                        if ui.button("⚙").clicked() {
+                            self.current_window = ActiveWindow::Settings;
+                        }
+                    });
                 });
             });
-        });
+        }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default()
+            .frame(backfround_frame)
+            .show(ctx, |ui| {
             match self.current_window {
                 ActiveWindow::Home => {
                     ui.vertical_centered(|ui| {
@@ -128,13 +139,16 @@ impl eframe::App for XmotionApp {
                         ui.add_space(20.0);
                         ui.label("Wallpaper Folder Location: ");
                         ui.add(egui::TextEdit::singleline(&mut self.folder_path).desired_width(400.0).hint_text(format!("{}/.xmotion_save", std::env::var("HOME").unwrap_or_default())));
-                        if ui.button("Change").clicked() {
-                            change_folder_path(self.folder_path.clone());
-                        }
+                        ui.checkbox(&mut self.top_bar, "");
                         ui.add_space(20.0);
                         ui.label("Transparency: ");
+                        ui.add(egui::Slider::new(&mut self.transparency, 0..=255).text("Transparency"));
                         ui.add_space(20.0);
                         ui.label("Top Bar: ");
+                        if ui.checkbox(&mut self.top_bar, "Show Top Bar").changed() {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(self.top_bar));
+                        }
+
                         ui.add_space(20.0);
                         ui.label("Size: ");
                         ui.add_space(20.0);
